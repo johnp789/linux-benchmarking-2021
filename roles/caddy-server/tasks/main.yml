@@ -1,0 +1,8 @@
+---
+
+  - name: caddy installation (x86_64)
+    include_tasks: caddy-x86_64.yml
+    when: ansible_architecture == "x86_64"
+  - name: caddy installation (aarch64)
+    include_tasks: caddy-aarch64.yml
+    when: ansible_architecture == "aarch64"

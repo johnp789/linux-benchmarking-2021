@@ -1,0 +1,70 @@
+---
+
+- hosts: localhost
+
+- hosts: all
+  vars:
+    benchmark_dir: /var/tmp/caddy-benchmark
+    listen_port: 8090
+    hey_time: 30
+    file_sizes:
+      - 1
+      - 2
+      - 10
+      - 100
+      - 1000
+    worker_counts:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 6
+      - 8
+      - 10
+      - 20
+      - 40
+      - 100
+      - 200
+  roles:
+    - role: caddy-server
+      tags: setup
+  post_tasks:
+    - name: check for results file
+      local_action:
+        module: stat
+        path: caddy-benchmark-results.csv
+      register: results_file_stat
+      run_once: yes
+      tags: run
+    - name: create results file
+      local_action:
+        module: shell
+        cmd: >
+          echo benchmark_timestamp,
+          hostname,
+          filesize_kb,
+          workers,
+          req_per_s
+          > caddy-benchmark-results.csv
+      when: not results_file_stat.stat.exists
+      run_once: yes
+      tags: run
+    - name: run hey
+      include_tasks: tasks/run-hey.yml
+      vars:
+        workers: "{{ item[0] }}"
+        size: "{{ item[1] }}"
+      loop: "{{ worker_counts | product(file_sizes) | list }}"
+      tags: run
+
+    - name: stop caddy
+      become: yes
+      systemd:
+        name: caddy-benchmark.service
+        state: stopped
+      tags: cleanup
+    - name: remove benchmark directory
+      file:
+        path: "{{ benchmark_dir }}"
+        state: absent
+      tags: cleanup

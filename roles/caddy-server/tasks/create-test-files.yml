@@ -1,0 +1,7 @@
+---
+
+  - name: create test files
+    command: 
+      cmd: "dd if=/dev/urandom of={{ benchmark_dir }}/{{ item }}-kb.dat bs={{ item }}kB count=1"
+      creates: "{{ benchmark_dir }}/{{ item }}-kb.dat"
+    loop: "{{ file_sizes }}"

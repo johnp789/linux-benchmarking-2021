@@ -1,0 +1,22 @@
+---
+
+- local_action:
+    module: shell
+    cmd: >
+      hey
+      -c {{ workers }}
+      -z {{ hey_time }}s 
+      http://{{ ansible_host }}:{{ listen_port }}/{{ size }}-kb.dat
+  register: hey_result
+  throttle: 1
+  tags: run
+- local_action:
+    module: shell
+    cmd: >
+      echo {{ hostvars['localhost'].ansible_date_time.iso8601_micro }},
+      {{ inventory_hostname }},
+      {{ size }},
+      {{ workers }},
+      {{ hey_result.stdout | regex_search('Requests/sec.*') | regex_search('\d+\.\d+') }}
+      >> caddy-benchmark-results.csv
+  tags: run

@@ -1,0 +1,23 @@
+---
+
+  - name: create benchmark directory
+    file:
+      path: "{{ benchmark_dir }}"
+      state: directory
+      mode: 0755
+  - name: caddy installation (x86_64)
+    copy:
+      src: ~/Downloads/caddy_linux_amd64
+      dest: "{{ benchmark_dir }}/caddy"
+      mode: 0755
+  - name: create test files
+    include_tasks: create-test-files.yml
+  - name: start caddy service
+    become: yes
+    command:
+      cmd: >
+        /usr/bin/systemd-run
+        --unit=caddy-benchmark.service
+        --working-directory={{ benchmark_dir }}
+        {{ benchmark_dir }}/caddy file-server -listen 0.0.0.0:{{ listen_port }}
+      creates: "/run/systemd/transient/caddy-benchmark.service"
