@@ -1,0 +1,29 @@
+---
+
+- local_action:
+    module: shell
+    cmd: >
+      podman run -it --rm
+      docker.io/library/redis:6.0.10-buster
+      redis-benchmark
+      -h {{ ansible_host }}
+      --csv -q
+      -n {{ (clients|int) * (pipeline|int) * 5000 }}
+      -c {{ clients }}
+      -P {{ pipeline }}
+      -t set,get,incr,lpush,rpush,lpop,rpop,sadd,hset,spop,zadd,zpopmin,mset
+  become: yes
+  register: result
+  throttle: 1
+  tags: run
+- local_action:
+    module: shell
+    cmd: >
+      echo {{ hostvars['localhost'].ansible_date_time.iso8601_micro }},
+      {{ inventory_hostname }},
+      {{ clients }},
+      {{ pipeline }},
+      {{ item | regex_replace(",", ", ") }}
+      >> redis-benchmark-results.csv
+  loop: "{{ result.stdout_lines }}"
+  tags: run

@@ -1,0 +1,73 @@
+---
+
+- hosts: localhost
+
+- hosts: all
+  vars:
+    client_counts:
+      - 1
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 64
+      - 128
+      - 256
+    pipeline_counts:
+      - 1
+      - 4
+      - 16
+      - 32
+  tasks:
+    - name: ensure podman is installed
+      pacman:
+        name: podman
+        state: present
+        update_cache: yes
+      become: yes
+      tags: setup
+    - name: start redis server
+      shell: podman container exists redisbench && echo -n running || podman run -d --rm --network=host --name redisbench docker.io/library/redis:6.0.10-buster
+      register: start_output
+      changed_when: start_output.stdout != "running"
+      become: yes
+      tags: setup
+
+    - name: check for results file
+      local_action:
+        module: stat
+        path: redis-benchmark-results.csv
+      register: results_file_stat
+      run_once: yes
+      tags: run
+    - name: create results file
+      local_action:
+        module: shell
+        cmd: >
+          echo benchmark_timestamp,
+          hostname,
+          clients,
+          pipeline,
+          op,
+          ops_per_s
+          > redis-benchmark-results.csv
+      when: not results_file_stat.stat.exists
+      run_once: yes
+      tags: run
+    - name: run redis-benchmark
+      include_tasks: tasks/run-redis-benchmark.yml
+      vars:
+        clients: "{{ outer_item[0] }}"
+        pipeline: "{{ outer_item[1] }}"
+      loop: "{{ client_counts | product(pipeline_counts) | list }}"
+      loop_control:
+        loop_var: outer_item
+      tags: run
+
+    - name: stop redis server
+      shell: podman container exists redisbench && podman kill redisbench || echo already exited
+      become: yes
+      register: stop_output
+      changed_when: stop_output.stdout != "already exited"
+      tags: cleanup
